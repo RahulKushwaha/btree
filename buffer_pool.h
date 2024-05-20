@@ -7,14 +7,12 @@
 #include <cassert>
 #include <map>
 #include <memory>
+#include <optional>
 #include <shared_mutex>
 
 constexpr node_id_t NODE_ID_START = 100000;
 
-node_id_t get_next() {
-  static node_id_t id{NODE_ID_START};
-  return (++id);
-}
+node_id_t get_next();
 
 struct btree_node {
   node_id_t id;
