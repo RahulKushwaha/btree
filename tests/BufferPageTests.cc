@@ -3,6 +3,7 @@
 //
 
 #include "../BufferPage.h"
+#include "../BufferPool.h"
 #include <gtest/gtest.h>
 #include <random>
 
@@ -102,7 +103,7 @@ TEST(BufferPageTests, SortDataList) {
   BufferPageControl pageControl(&bufferPage);
 
   int blockSize{8};
-  auto limit = 10;
+  auto limit = (PAGE_SIZE - HEADER_SIZE) / (blockSize + sizeof(data_location_t));
 
   for (int i = 0; i < limit; i++) {
     auto location = pageControl.getFreeBlock(blockSize);
@@ -114,7 +115,7 @@ TEST(BufferPageTests, SortDataList) {
     ASSERT_EQ(dataList.size(), i + 1);
   }
 
-  pageControl.sortDataList();
+  pageControl.sortDataList(memcmp_diff_size);
 
   auto lastValue{1};
   for (auto &dataLocation: pageControl.getDataList()) {
@@ -157,7 +158,7 @@ TEST(BufferPageTests, SortStringData) {
     std::cout << dataLocation << std::endl;
   }
 
-  pageControl.sortDataList();
+  pageControl.sortDataList(memcmp_diff_size);
 
   for (auto &dataLocation: pageControl.getDataList()) {
     auto optionalBlockLocation = pageControl.getBlock(dataLocation.id);
@@ -172,5 +173,130 @@ TEST(BufferPageTests, SortStringData) {
     }
 
     std::cout << "Block Location: " << blockLocation << " | " << ss.str() << std::endl;
+  }
+}
+
+TEST(BufferPageTests, SortBTreeNodes) {
+  BufferPage bufferPage{};
+  BufferPageControl pageControl(&bufferPage);
+  std::vector<std::string> inputs{
+      "z",
+      "xy",
+      "pov",
+      "a",
+      "b",
+      "ab",
+      "abc",
+      "c",
+      "ca",
+      "dab",
+      "abcde",
+  };
+
+  auto limit = inputs.size();
+
+  for (int i = 0; i < limit; i++) {
+    auto &input = inputs[i];
+    auto blockSize = getBlockSizeForNonLeafNode(input.length());
+
+    auto location = pageControl.getFreeBlock(blockSize);
+    ASSERT_TRUE(location.has_value());
+    auto locationPtr = location.value();
+    writeNonLeafNode(i, input, locationPtr, blockSize);
+
+    auto dataList = pageControl.getDataList();
+    ASSERT_EQ(dataList.size(), i + 1);
+  }
+
+  pageControl.sortDataList(nodeCompareFunction);
+
+  for (auto dataLocation: pageControl.getDataList()) {
+    std::cout << dataLocation << std::endl;
+  }
+
+  for (auto &dataLocation: pageControl.getDataList()) {
+    auto optionalBlockLocation = pageControl.getBlock(dataLocation.id);
+    ASSERT_TRUE(optionalBlockLocation.has_value());
+    auto blockLocation = optionalBlockLocation.value();
+    non_leaf_key_value_t nonLeafKeyValue = readFromNonLeafNode(blockLocation.ptr, blockLocation.length);
+
+    std::stringstream ss;
+    for (int i = 0; i < *nonLeafKeyValue.keyLength; i++) {
+      ss << nonLeafKeyValue.key[i];
+    }
+
+    std::cout << "Block Location: " << blockLocation << " | " << ss.str() << std::endl;
+  }
+}
+
+TEST(BufferPageTests, FindInsertLocationForBTreeNode) {
+  BufferPage bufferPage{};
+  BufferPageControl pageControl(&bufferPage);
+  std::vector<std::string> inputs{
+      "z",
+      "xy",
+      "pov",
+      "a",
+      "b",
+      "ab",
+      "abc",
+      "c",
+      "ca",
+      "dab",
+      "abcde",
+  };
+
+  auto limit = inputs.size();
+
+  for (int i = 0; i < limit; i++) {
+    auto &input = inputs[i];
+    auto blockSize = getBlockSizeForNonLeafNode(input.length());
+
+    auto location = pageControl.getFreeBlock(blockSize);
+    ASSERT_TRUE(location.has_value());
+    auto locationPtr = location.value();
+    writeNonLeafNode(i, input, locationPtr, blockSize);
+
+    auto dataList = pageControl.getDataList();
+    ASSERT_EQ(dataList.size(), i + 1);
+  }
+
+  pageControl.sortDataList(nodeCompareFunction);
+
+  for (auto &dataLocation: pageControl.getDataList()) {
+    auto optionalBlockLocation = pageControl.getBlock(dataLocation.id);
+    ASSERT_TRUE(optionalBlockLocation.has_value());
+    auto blockLocation = optionalBlockLocation.value();
+    non_leaf_key_value_t nonLeafKeyValue = readFromNonLeafNode(blockLocation.ptr, blockLocation.length);
+
+    std::stringstream ss;
+    for (int i = 0; i < *nonLeafKeyValue.keyLength; i++) {
+      ss << nonLeafKeyValue.key[i];
+    }
+
+    std::cout << "Block Location: " << blockLocation << " | " << ss.str() << std::endl;
+  }
+
+  std::vector<std::pair<std::string, std::string>> insertLocations{
+      {"a", "a"},
+      {"b", "b"},
+      {"d", "ca"},
+      {"dabe", "dab"},
+      {"zz", "z"},
+      {"s", "pov"},
+      {"w", "pov"},
+  };
+
+  btree_node_1_t node{&pageControl};
+  for (auto &insertLocation: insertLocations) {
+    auto location = node.search(insertLocation.first);
+
+    auto optionalBlock = pageControl.getBlock(location.id);
+    ASSERT_TRUE(optionalBlock.has_value());
+
+    auto block = optionalBlock.value();
+    NonLeafKeyValue nonLeafKeyValue = readFromNonLeafNode(block.ptr, block.length);
+    std::cout << "key to insert: " << insertLocation.first << " | " << "insert location: " << nonLeafKeyValue.getKeyStr() << " | " << "expected insert location: " << insertLocation.second << std::endl;
+    ASSERT_EQ(insertLocation.second, nonLeafKeyValue.getKeyStr());
   }
 }

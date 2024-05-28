@@ -1,4 +1,4 @@
-#include "btree.h"
+#include "BTree.h"
 #include <algorithm>
 #include <iostream>
 #include <random>
@@ -8,7 +8,7 @@ int main() {
   std::random_device rnd_device;
   // Specify the engine and distribution.
   std::mt19937 mersenne_engine{rnd_device()};// Generates random integers
-  std::uniform_int_distribution<int> dist{1, 20};
+  std::uniform_int_distribution<int> dist{5000, 9000};
 
   auto gen = [&dist, &mersenne_engine]() {
     return dist(mersenne_engine);
@@ -17,19 +17,20 @@ int main() {
 
   for (int i = 1; i < 2; i++) {
     std::cout << "Iteration: " << i << std::endl;
-    btree tree{};
-    tree.insert(std::numeric_limits<key_t>::min());
+    BTree tree{};
+    tree.insert(std::to_string(0), std::to_string(0));
 
-    std::vector<int> vec(gen());
+    std::vector<int> vec(10, gen());
     std::generate(begin(vec), end(vec), gen);
 
     for (auto c: vec) {
-      tree.insert(c);
+      tree.insert(std::to_string(c), std::to_string(c));
     }
 
     auto elements = tree.elements();
     tree.debug_print();
-    assert(std::is_sorted(elements.begin(), elements.end()));
+    std::cout << std::endl;
+    //    assert(std::is_sorted(elements.begin(), elements.end()));
   }
 
   //  btree tree{};

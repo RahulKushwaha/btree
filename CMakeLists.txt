@@ -3,14 +3,17 @@ project(btree)
 
 set(CMAKE_CXX_STANDARD 23)
 
-add_executable(btree main.cpp
-        btree.h
-        buffer_pool.h
-        common.h
+add_executable(
+        btree main.cpp
+
+        BTree.h
+        BufferPool.h
+        BufferPool.cc
+        Common.h
         BufferPage.h
         FileIO.h
         FileIO.cc
-        buffer_pool.cc)
+)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -27,8 +30,8 @@ add_executable(
         tests/BufferPageTests.cc
         FileIO.h
         FileIO.cc
-        buffer_pool.cc
-        buffer_pool.h
+        BufferPool.cc
+        BufferPool.h
         tests/FileIOTests.cc
 )
 
