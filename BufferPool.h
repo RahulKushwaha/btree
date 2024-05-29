@@ -5,6 +5,7 @@
 #pragma once
 #include "BufferPage.h"
 #include "Common.h"
+#include "FileIO.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
@@ -14,7 +15,7 @@
 #include <shared_mutex>
 #include <sstream>
 
-constexpr node_id_t NODE_ID_START = 100000;
+constexpr node_id_t NODE_ID_START = 0;
 
 node_id_t getNext();
 
@@ -90,6 +91,8 @@ struct BTreeNode {
   explicit BTreeNode(BufferPageControl *bufferPageControl) : bufferPageControl_{bufferPageControl}, btreeNodeHeader{reinterpret_cast<btree_node_header_t *>(bufferPageControl_->getSubHeaderLocation().ptr)} {}
 
   std::pair<Result, data_location_t> insertNonLeaf(node_id_t childNode, const std::string &key) {
+    assert(isLeaf() == false && "cannot insert in leaf");
+
     auto size = sizeof(node_id_t) + sizeof(length_t) + key.size();
 
     if (size > bufferPageControl_->getTotalFreeSpace()) {
@@ -107,6 +110,8 @@ struct BTreeNode {
   }
 
   std::pair<Result, data_location_t> insertLeaf(const std::string &key, const std::string &value) {
+    assert(isLeaf() && "cannot insert in non-leaf");
+
     auto size = sizeof(length_t) * 2 + key.size() + value.size();
 
     if (size > bufferPageControl_->getTotalFreeSpace()) {
@@ -278,6 +283,8 @@ using btree_node_ptr_t = btree_node_t *;
 
 class BufferPool {
  public:
+  explicit BufferPool(std::shared_ptr<FileIO> fileIO) : fileIO_{std::move(fileIO)} {}
+
   btree_node_ptr_t createNew(bool isLeaf) {
     auto page = std::aligned_alloc(PAGE_SIZE, PAGE_SIZE);
     auto bufferPage = reinterpret_cast<BufferPage *>(page);
@@ -300,14 +307,37 @@ class BufferPool {
   std::optional<btree_node_ptr_t> get(node_id_t id) {
     auto itr = lookup_.find(id);
     if (itr == lookup_.end()) {
-      return {};
+      auto page = std::aligned_alloc(PAGE_SIZE, PAGE_SIZE);
+      fileIO_->fRead(id * PAGE_SIZE, page);
+      auto bufferPage = reinterpret_cast<BufferPage *>(page);
+      auto *pageControl = new BufferPageControl{bufferPage};
+      auto *node = new BTreeNode{pageControl};
+
+      auto result = lookup_.emplace(id, node);
+      assert(result.second && "failed to add to buffer pool");
+      return {result.first->second};
     }
 
     return {itr->second};
   }
 
+  void flushAll() {
+    for (auto [nodeId, node]: lookup_) {
+      auto offset = nodeId * PAGE_SIZE;
+      fileIO_->fWrite(offset, node->bufferPageControl_->getBufferPage());
+      fileIO_->sync();
+    }
+  }
+
+  ~BufferPool() {
+    for (auto [nodeId, node]: lookup_) {
+      free(node->bufferPageControl_->getBufferPage());
+    }
+  }
+
  private:
   std::map<node_id_t, btree_node_ptr_t> lookup_;
+  std::shared_ptr<FileIO> fileIO_;
 };
 
 using buffer_pool_t = BufferPool;

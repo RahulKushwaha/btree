@@ -8,6 +8,8 @@
 #include <cstring>
 #include <functional>
 
+constexpr std::uint64_t PAGE_SIZE = 4096;
+
 using node_id_t = std::uint64_t;
 
 using cmp_func_t = std::function<bool(void *s1, void *s2, std::uint32_t size1, std::uint32_t size2)>;

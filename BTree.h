@@ -17,8 +17,19 @@ constexpr node_id_t EMPTY_NODE_ID = 0;
 
 class BTree {
  public:
-  BTree() : bufferPool_{std::make_shared<buffer_pool_t>()},
-            root_{bufferPool_->createNew(true)} {}
+  explicit BTree(std::shared_ptr<BufferPool> bufferPool)
+      : bufferPool_{std::move(bufferPool)},
+        root_{bufferPool_->createNew(true)} {}
+
+  BTree(std::shared_ptr<BufferPool> bufferPool, node_id_t rootId)
+      : bufferPool_{std::move(bufferPool)}, root_{bufferPool_->get(rootId).value_or(nullptr)} {
+    assert(root_ != nullptr);
+    assert(rootId == root_->getId());
+  }
+
+  node_id_t getRootId() {
+    return root_->getId();
+  }
 
   bool insert(std::string key, std::string value) {
     btree_node_ptr_t parent{nullptr};
@@ -38,7 +49,7 @@ class BTree {
         return getBlockSizeForLeafNode(key.size(), value.size());
       }();
 
-      if (spaceRequired > node->getUsableFreeSpace()) {
+      if (node->getDataList().size() > 5) {
         bool rootSplit{false};
         if (node == root_) {
           auto new_root = bufferPool_->createNew(false);
@@ -61,6 +72,9 @@ class BTree {
         auto location = node->search(key);
         auto optionalBlock = node->bufferPageControl_->getBlock(location.id);
         assert(optionalBlock.has_value());
+        auto block = optionalBlock.value();
+        auto nonLeafKeyValue = readFromNonLeafNode(block.ptr, block.length);
+        nodeId = *nonLeafKeyValue.childNodeId;
       }
     }
 
@@ -95,7 +109,6 @@ class BTree {
     };
 
     parent->bufferPageControl_->sortDataList(compareFunction);
-
     return true;
   }
 
@@ -125,10 +138,8 @@ class BTree {
       count++;
 
       if (count >= splitLimit) {
-        newNode->copyDataBlock(dataLocation, newNode);
-        node->erase(dataLocation);
-
-        break;
+        node->copyDataBlock(dataLocation, newNode);
+        node->bufferPageControl_->releaseBlock(dataLocation.id);
       }
     }
 
@@ -142,6 +153,8 @@ class BTree {
       auto smallestKey = node->getSmallestKey();
       parent->insertNonLeaf(node->getId(), smallestKey);
     }
+
+    parent->sortDataDictionary();
   }
 
   void debugPrint(btree_node_ptr_t node) const {
@@ -157,7 +170,7 @@ class BTree {
         assert(optionalBlock.has_value());
         auto block = optionalBlock.value();
         auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
-        std::cout << "key: " << leafKeyValue.getKeyStr() << " value: " << leafKeyValue.getValueStr() << " | ";
+        std::cout << "key: " << leafKeyValue.getKeyStr() << ",7 value: " << leafKeyValue.getValueStr() << " | ";
       }
 
       std::cout << std::endl
@@ -177,7 +190,7 @@ class BTree {
       auto nonLeafKeyValue = readFromNonLeafNode(block.ptr, block.length);
 
       assert(*nonLeafKeyValue.childNodeId != EMPTY_NODE_ID && "non leaf cannot have nullptr as child");
-      std::cout << nonLeafKeyValue.getKeyStr() << " | ";
+      std::cout << "key: " << nonLeafKeyValue.getKeyStr() << ", child: " << *nonLeafKeyValue.childNodeId << " | ";
     }
 
     std::cout << std::endl

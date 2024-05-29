@@ -2,13 +2,14 @@
 // Created by Rahul  Kushwaha on 5/19/24.
 //
 #pragma once
+#include "Common.h"
 #include <cassert>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
-#include <libexplain/write.h>
+#include <libexplain/pwrite.h>
 #include <memory>
 #include <unistd.h>
 
@@ -20,31 +21,43 @@ class FileIO;
 
 std::shared_ptr<FileIO> makeFileIO(std::string filePath);
 
-constexpr int BLOCK_SIZE = 512;
 using offset_t = __off_t;
 
 class FileIO {
  public:
   explicit FileIO(int fd) : fd_{fd} {}
 
-  bool fileIOWrite(offset_t offset, void *buffer) {
+  bool fWrite(offset_t offset, void *buffer) {
     //Check if the input memory buffer is aligned.
     assert(is_aligned(buffer));
+    assert(offset % PAGE_SIZE == 0);
 
-    assert(offset % BLOCK_SIZE == 0);
-    alignas(BLOCK_SIZE) char nu_buffer[BLOCK_SIZE];
-    auto result = pwrite(fd_, nu_buffer, BLOCK_SIZE, offset);
+    auto result = pwrite(fd_, buffer, PAGE_SIZE, offset);
     if (result == -1) {
-      std::cout << explain_write(fd_, nu_buffer, BLOCK_SIZE);
+      //      std::cout << explain_pwrite(fd_, buffer, BLOCK_SIZE);
       return false;
     }
 
     return true;
   }
 
-  bool read(offset_t offset, void *buffer) {
-    auto result = pread(fd_, buffer, BLOCK_SIZE, offset);
+  bool fRead(offset_t offset, void *buffer) {
+    //Check if the input memory buffer is aligned.
+    assert(is_aligned(buffer));
+    assert(offset % PAGE_SIZE == 0);
+
+    auto result = pread(fd_, buffer, PAGE_SIZE, offset);
     if (result == -1) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool sync() {
+    auto result = fsync(fd_);
+    if (result == -1) {
+      std::cout << "failed to sync" << std::endl;
       return false;
     }
 

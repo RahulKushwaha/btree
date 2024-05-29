@@ -14,23 +14,35 @@ int main() {
     return dist(mersenne_engine);
   };
 
-
-  for (int i = 1; i < 2; i++) {
-    std::cout << "Iteration: " << i << std::endl;
-    BTree tree{};
+  auto fileIO = makeFileIO("/tmp/input.txt");
+  node_id_t rootId = -1;
+  {
+    std::cout << "Iteration: 0" << std::endl;
+    auto bufferPool = std::make_shared<BufferPool>(fileIO);
+    BTree tree{bufferPool};
     tree.insert(std::to_string(0), std::to_string(0));
 
-    std::vector<int> vec(10, gen());
+    std::vector<int> vec(40, gen());
     std::generate(begin(vec), end(vec), gen);
 
     for (auto c: vec) {
       tree.insert(std::to_string(c), std::to_string(c));
     }
 
-    auto elements = tree.elements();
     tree.debug_print();
     std::cout << std::endl;
-    //    assert(std::is_sorted(elements.begin(), elements.end()));
+
+    bufferPool->flushAll();
+
+    rootId = tree.getRootId();
+  }
+
+  {
+    std::cout << "printing elements" << std::endl;
+    auto bufferPool = std::make_shared<BufferPool>(fileIO);
+    BTree tree{bufferPool, rootId};
+    tree.debug_print();
+    std::cout << std::endl;
   }
 
   //  btree tree{};

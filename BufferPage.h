@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
-constexpr std::uint64_t PAGE_SIZE = 4096;
+
 constexpr std::uint64_t HEADER_SIZE = 64;
 
 struct BufferPageHeader {
@@ -164,7 +164,7 @@ class BufferPageControl {
     if (found) {
       dataLocation = dataList_;
       for (int j = i; j - 1 >= 0; j--) {
-        *(dataLocation) = *(dataLocation - 1);
+        dataLocation[j] = dataLocation[j - 1];
       }
 
       dataList_ = newDataLocation;
@@ -243,6 +243,10 @@ class BufferPageControl {
 
                 return compareFunction(dataX, dataY, x.length, y.length);
               });
+  }
+
+  buffer_page_t *getBufferPage() {
+    return bufferPage_;
   }
 
  private:
