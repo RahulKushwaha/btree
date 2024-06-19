@@ -14,7 +14,8 @@ int main() {
     return dist(mersenne_engine);
   };
 
-  auto fileIO = makeFileIO("/tmp/input.txt");
+  std::string path{std::format("/tmp/input_{}.txt", std::chrono::system_clock::now().time_since_epoch().count())};
+  auto fileIO = makeFileIO(path);
   node_id_t rootId = -1;
   {
     std::cout << "Iteration: 0" << std::endl;
@@ -26,11 +27,20 @@ int main() {
     std::generate(begin(vec), end(vec), gen);
 
     for (auto c: vec) {
+      std::cout << "Insert " << c << std::endl;
       tree.insert(std::to_string(c), std::to_string(c));
     }
 
     tree.debug_print();
     std::cout << std::endl;
+    auto elements = tree.elements();
+    auto sorted = std::is_sorted(elements.begin(), elements.end());
+    std::cout << "Printing Elements" << std::endl;
+    for (auto &element: elements) {
+      std::cout << element << std::endl;
+    }
+
+    assert(sorted);
 
     bufferPool->flushAll();
 

@@ -15,6 +15,22 @@
 
 constexpr node_id_t EMPTY_NODE_ID = 0;
 
+auto getCompareFunction(bool isLeaf) {
+  auto compareFunction = [leaf = isLeaf](void *block1, void *block2, length_t block1Size, length_t block2Size) {
+    if (leaf) {
+      auto node1 = readFromLeafNode(block1, block1Size);
+      auto node2 = readFromLeafNode(block2, block2Size);
+      return memcmp_diff_size(node1.key, node2.key, *node1.keyLength, *node2.keyLength);
+    }
+
+    auto node1 = readFromNonLeafNode(block1, block1Size);
+    auto node2 = readFromNonLeafNode(block2, block2Size);
+    return memcmp_diff_size(node1.key, node2.key, *node1.keyLength, *node2.keyLength);
+  };
+
+  return compareFunction;
+}
+
 class BTree {
  public:
   explicit BTree(std::shared_ptr<BufferPool> bufferPool)
@@ -41,13 +57,10 @@ class BTree {
       assert(optionalNode.has_value() && "node not found in buffer_pool");
       node = optionalNode.value();
 
-      auto spaceRequired = [&key, &node, &value]() {
-        if (node->isLeaf()) {
-          return getBlockSizeForNonLeafNode(key.size());
-        }
-
-        return getBlockSizeForLeafNode(key.size(), value.size());
-      }();
+      //      node->lock();
+      //      if (parent) {
+      //        parent->unlock();
+      //      }
 
       if (node->getDataList().size() > 5) {
         bool rootSplit{false};
@@ -96,19 +109,9 @@ class BTree {
     auto result = parent->insertLeaf(key, value);
     assert(result.first == BTreeNode::Result::SUCCESS);
 
-    auto compareFunction = [leaf = parent->isLeaf()](void *block1, void *block2, length_t block1Size, length_t block2Size) {
-      if (leaf) {
-        auto node1 = readFromLeafNode(block1, block1Size);
-        auto node2 = readFromLeafNode(block2, block2Size);
-        return memcmp_diff_size(node1.key, node2.key, *node1.keyLength, *node2.keyLength);
-      }
+    parent->bufferPageControl_->sortDataList(getCompareFunction(parent->isLeaf()));
+    //parent->unlock();
 
-      auto node1 = readFromNonLeafNode(block1, block1Size);
-      auto node2 = readFromNonLeafNode(block2, block2Size);
-      return memcmp_diff_size(node1.key, node2.key, *node1.keyLength, *node2.keyLength);
-    };
-
-    parent->bufferPageControl_->sortDataList(compareFunction);
     return true;
   }
 
@@ -146,6 +149,9 @@ class BTree {
     node->setParent(parent->getId());
     newNode->setParent(parent->getId());
 
+    node->sortDataDictionary(getCompareFunction(node->isLeaf()));
+    newNode->sortDataDictionary(getCompareFunction(newNode->isLeaf()));
+
     auto smallestKeyInNewNode = newNode->getSmallestKey();
     parent->insertNonLeaf(newNode->getId(), smallestKeyInNewNode);
 
@@ -154,7 +160,7 @@ class BTree {
       parent->insertNonLeaf(node->getId(), smallestKey);
     }
 
-    parent->sortDataDictionary();
+    parent->sortDataDictionary(getCompareFunction(parent->isLeaf()));
   }
 
   void debugPrint(btree_node_ptr_t node) const {
@@ -170,7 +176,7 @@ class BTree {
         assert(optionalBlock.has_value());
         auto block = optionalBlock.value();
         auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
-        std::cout << "key: " << leafKeyValue.getKeyStr() << ",7 value: " << leafKeyValue.getValueStr() << " | ";
+        std::cout << "key: " << leafKeyValue.getKeyStr() << ", value: " << leafKeyValue.getValueStr() << " | ";
       }
 
       std::cout << std::endl

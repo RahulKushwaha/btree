@@ -14,6 +14,7 @@
 #include <optional>
 #include <shared_mutex>
 #include <sstream>
+#include <thread>
 
 constexpr node_id_t NODE_ID_START = 0;
 
@@ -88,7 +89,7 @@ struct BTreeNode {
     SUCCESS,
   };
 
-  explicit BTreeNode(BufferPageControl *bufferPageControl) : bufferPageControl_{bufferPageControl}, btreeNodeHeader{reinterpret_cast<btree_node_header_t *>(bufferPageControl_->getSubHeaderLocation().ptr)} {}
+  explicit BTreeNode(BufferPageControl *bufferPageControl) : bufferPageControl_{bufferPageControl}, btreeNodeHeader_{reinterpret_cast<btree_node_header_t *>(bufferPageControl_->getSubHeaderLocation().ptr)}, mtx_{std::make_shared<std::mutex>()} {}
 
   std::pair<Result, data_location_t> insertNonLeaf(node_id_t childNode, const std::string &key) {
     assert(isLeaf() == false && "cannot insert in leaf");
@@ -183,7 +184,7 @@ struct BTreeNode {
       BTreeNode *node{this};
 
       Key key = [&dataY, node, &y]() {
-        if (node->btreeNodeHeader->isLeaf) {
+        if (node->btreeNodeHeader_->isLeaf) {
           auto keyValue = readFromLeafNode(dataY, y->length);
           return Key{
               .length = *keyValue.keyLength,
@@ -238,8 +239,8 @@ struct BTreeNode {
     return bufferPageControl_->getTotalFreeSpace();
   }
 
-  void sortDataDictionary() {
-    bufferPageControl_->sortDataList(nodeCompareFunction);
+  void sortDataDictionary(const cmp_func_t &compareFunction) {
+    bufferPageControl_->sortDataList(compareFunction);
   }
 
   std::vector<data_location_t *> getDataListPtrs() const {
@@ -251,31 +252,42 @@ struct BTreeNode {
   }
 
   bool isLeaf() const {
-    return btreeNodeHeader->isLeaf == 1;
+    return btreeNodeHeader_->isLeaf == 1;
   }
 
   void setLeaf() {
-    btreeNodeHeader->isLeaf = 1;
+    btreeNodeHeader_->isLeaf = 1;
   }
 
   node_id_t getId() const {
-    return btreeNodeHeader->id;
+    return btreeNodeHeader_->id;
   }
 
   void setId(node_id_t id) {
-    btreeNodeHeader->id = id;
+    btreeNodeHeader_->id = id;
   }
 
   node_id_t getParent() const {
-    return btreeNodeHeader->parent;
+    return btreeNodeHeader_->parent;
   }
 
   void setParent(node_id_t parentId) {
-    btreeNodeHeader->parent = parentId;
+    btreeNodeHeader_->parent = parentId;
+  }
+
+  void lock() {
+    std::cout << "locking: " << btreeNodeHeader_->id << std::endl;
+    mtx_->lock();
+  }
+
+  void unlock() {
+    std::cout << "unlocking: " << btreeNodeHeader_->id << std::endl;
+    mtx_->unlock();
   }
 
   buffer_page_control_t *bufferPageControl_;
-  btree_node_header_t *btreeNodeHeader;
+  btree_node_header_t *btreeNodeHeader_;
+  std::shared_ptr<std::mutex> mtx_;
 };
 
 using btree_node_t = BTreeNode;

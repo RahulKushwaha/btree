@@ -14,8 +14,7 @@ bool is_aligned(void *p) {
 std::shared_ptr<FileIO> makeFileIO(std::string filePath) {
   int fd = open(filePath.c_str(), O_CREAT | O_RDWR | O_DIRECT | O_TRUNC);
   if (fd == -1) {
-    int result = close(fd);
-    assert(result != -1);
+    assert(fd != -1);
   }
 
   std::cout << "file created, fd: " << fd << std::endl;
