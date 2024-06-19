@@ -53,14 +53,15 @@ class BTree {
 
     node_id_t nodeId = root_->getId();
     while (nodeId != EMPTY_NODE_ID) {
+      std::cout << nodeId << std::endl;
       auto optionalNode = bufferPool_->get(nodeId);
       assert(optionalNode.has_value() && "node not found in buffer_pool");
       node = optionalNode.value();
 
-      //      node->lock();
-      //      if (parent) {
-      //        parent->unlock();
-      //      }
+      node->lock();
+      if (parent) {
+        parent->unlock();
+      }
 
       if (node->getDataList().size() > 5) {
         bool rootSplit{false};
@@ -68,13 +69,16 @@ class BTree {
           auto new_root = bufferPool_->createNew(false);
           root_ = new_root;
           parent = root_;
+          parent->lock();
           rootSplit = true;
         }
 
         split(node, parent, rootSplit);
+
+        node->unlock();
+
         auto optionalParentNode = bufferPool_->get(node->getParent());
         node = optionalParentNode.value_or(nullptr);
-        parent = optionalParentNode.value_or(nullptr);
       }
 
       parent = node;
@@ -110,7 +114,7 @@ class BTree {
     assert(result.first == BTreeNode::Result::SUCCESS);
 
     parent->bufferPageControl_->sortDataList(getCompareFunction(parent->isLeaf()));
-    //parent->unlock();
+    parent->unlock();
 
     return true;
   }
