@@ -12,6 +12,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <shared_mutex>
 #include <sstream>
 #include <thread>
@@ -89,7 +90,7 @@ struct BTreeNode {
     SUCCESS,
   };
 
-  explicit BTreeNode(BufferPageControl *bufferPageControl) : bufferPageControl_{bufferPageControl}, btreeNodeHeader_{reinterpret_cast<btree_node_header_t *>(bufferPageControl_->getSubHeaderLocation().ptr)}, mtx_{std::make_shared<std::mutex>()} {}
+  explicit BTreeNode(BufferPageControl *bufferPageControl) : bufferPageControl_{bufferPageControl}, btreeNodeHeader_{reinterpret_cast<btree_node_header_t *>(bufferPageControl_->getSubHeaderLocation().ptr)}, mtx_{std::make_shared<std::mutex>()}, debugMtx_{std::make_unique<std::mutex>()} {}
 
   std::pair<Result, data_location_t> insertNonLeaf(node_id_t childNode, const std::string &key) {
     assert(isLeaf() == false && "cannot insert in leaf");
@@ -127,6 +128,15 @@ struct BTreeNode {
     writeLeafNode(key, value, block, size);
 
     return {Result::SUCCESS, data_location_t{}};
+  }
+
+  void eraseAll() {
+    auto dataDictionaryList = bufferPageControl_->getDataList();
+
+    for (auto dataBlock: dataDictionaryList) {
+      auto result = bufferPageControl_->releaseBlock(dataBlock.id);
+      assert(result);
+    }
   }
 
   bool erase(data_location_t dataLocation) {
@@ -207,6 +217,26 @@ struct BTreeNode {
     return **result;
   }
 
+  void copyAllDataBlocks(BTreeNode *dest) {
+    auto dataDictionaryList = bufferPageControl_->getDataList();
+
+    for (auto dataBlock: dataDictionaryList) {
+      auto optionalBlock = bufferPageControl_->getBlock(dataBlock.id);
+      assert(optionalBlock.has_value());
+
+      auto block = optionalBlock.value();
+
+      // 1 means it is leaf, otherwise 0.
+      if (isLeaf()) {
+        auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
+        dest->insertLeaf(leafKeyValue.getKeyStr(), leafKeyValue.getValueStr());
+      } else {
+        auto nonLeafKeyValue = readFromNonLeafNode(block.ptr, block.length);
+        dest->insertNonLeaf(*nonLeafKeyValue.childNodeId, nonLeafKeyValue.getKeyStr());
+      }
+    }
+  }
+
   void copyDataBlock(data_location_t srcDataLocation, BTreeNode *dest) {
     auto dataDictionaryList = bufferPageControl_->getDataList();
     auto itr = std::find(dataDictionaryList.begin(), dataDictionaryList.end(), srcDataLocation);
@@ -259,6 +289,10 @@ struct BTreeNode {
     btreeNodeHeader_->isLeaf = 1;
   }
 
+  void setNonLeaf() {
+    btreeNodeHeader_->isLeaf = 0;
+  }
+
   node_id_t getId() const {
     return btreeNodeHeader_->id;
   }
@@ -276,18 +310,39 @@ struct BTreeNode {
   }
 
   void lock() {
-    std::cout << "locking: " << btreeNodeHeader_->id << std::endl;
+    {
+      std::lock_guard lg{*debugMtx_};
+      auto result = threadIds_.insert(std::this_thread::get_id());
+      std::stringstream ss;
+      ss << "failed: thread: " << std::this_thread::get_id() << " nodeId: "
+         << btreeNodeHeader_->id;
+      if (!result.second) {
+        std::cout << ss.str() << std::endl;
+      }
+      assert(result.second);
+    }
+    std::cout << "threadId: " << std::this_thread::get_id() << " locking: " << btreeNodeHeader_->id << std::endl;
     mtx_->lock();
+    std::cout << "threadId: " << std::this_thread::get_id() << " locked: " << btreeNodeHeader_->id << std::endl;
   }
 
   void unlock() {
-    std::cout << "unlocking: " << btreeNodeHeader_->id << std::endl;
+    {
+      std::lock_guard lg{*debugMtx_};
+      auto result = threadIds_.contains(std::this_thread::get_id());
+      assert(result && "cannot unlock non-owning lock");
+      threadIds_.erase(std::this_thread::get_id());
+    }
+    std::cout << "threadId: " << std::this_thread::get_id() << " unlocking: " << btreeNodeHeader_->id << std::endl;
     mtx_->unlock();
+    std::cout << "threadId: " << std::this_thread::get_id() << " unlocked: " << btreeNodeHeader_->id << std::endl;
   }
 
   buffer_page_control_t *bufferPageControl_;
   btree_node_header_t *btreeNodeHeader_;
   std::shared_ptr<std::mutex> mtx_;
+  std::unique_ptr<std::mutex> debugMtx_;
+  std::set<std::thread::id> threadIds_;
 };
 
 using btree_node_t = BTreeNode;
@@ -295,9 +350,12 @@ using btree_node_ptr_t = btree_node_t *;
 
 class BufferPool {
  public:
-  explicit BufferPool(std::shared_ptr<FileIO> fileIO) : fileIO_{std::move(fileIO)} {}
+  explicit BufferPool(std::shared_ptr<FileIO> fileIO)
+      : fileIO_{std::move(fileIO)}, mtx_{std::make_unique<std::mutex>()} {}
 
   btree_node_ptr_t createNew(bool isLeaf) {
+    std::lock_guard lg{*mtx_};
+
     auto page = std::aligned_alloc(PAGE_SIZE, PAGE_SIZE);
     auto bufferPage = reinterpret_cast<BufferPage *>(page);
     auto *pageControl = new BufferPageControl{bufferPage};
@@ -317,6 +375,8 @@ class BufferPool {
   }
 
   std::optional<btree_node_ptr_t> get(node_id_t id) {
+    std::lock_guard lg{*mtx_};
+
     auto itr = lookup_.find(id);
     if (itr == lookup_.end()) {
       auto page = std::aligned_alloc(PAGE_SIZE, PAGE_SIZE);
@@ -334,6 +394,8 @@ class BufferPool {
   }
 
   void flushAll() {
+    std::lock_guard lg{*mtx_};
+
     for (auto [nodeId, node]: lookup_) {
       auto offset = nodeId * PAGE_SIZE;
       fileIO_->fWrite(offset, node->bufferPageControl_->getBufferPage());
@@ -350,6 +412,7 @@ class BufferPool {
  private:
   std::map<node_id_t, btree_node_ptr_t> lookup_;
   std::shared_ptr<FileIO> fileIO_;
+  std::unique_ptr<std::mutex> mtx_;
 };
 
 using buffer_pool_t = BufferPool;

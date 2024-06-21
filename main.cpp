@@ -1,7 +1,9 @@
 #include "BTree.h"
 #include <algorithm>
+#include <future>
 #include <iostream>
 #include <random>
+#include <thread>
 
 int main() {
   // First create an instance of an engine.
@@ -23,20 +25,27 @@ int main() {
     BTree tree{bufferPool};
     tree.insert(std::to_string(0), std::to_string(0));
 
-    std::vector<int> vec(40, gen());
+    std::vector<int> vec(20000, gen());
     std::generate(begin(vec), end(vec), gen);
 
+    std::vector<std::future<bool>> results;
     for (auto c: vec) {
       std::cout << "Insert " << c << std::endl;
-      tree.insert(std::to_string(c), std::to_string(c));
+      std::future<bool> insertionResult = std::async(std::launch::async, &BTree::insert, tree, std::to_string(c), std::to_string(c));
+//      insertionResult.get();
+      results.emplace_back(std::move(insertionResult));
+    }
+
+    for (auto &result: results) {
+      result.get();
     }
 
     tree.debug_print();
     std::cout << std::endl;
-    auto elements = tree.elements();
-    auto sorted = std::is_sorted(elements.begin(), elements.end());
+    auto elements = tree.elements();    auto sorted = std::is_sorted(elements.begin(), elements.end());
     std::cout << "Printing Elements" << std::endl;
     for (auto &element: elements) {
+
       std::cout << element << std::endl;
     }
 

@@ -48,40 +48,56 @@ class BTree {
   }
 
   bool insert(std::string key, std::string value) {
+    std::cout << "insert: " << key << " running on thread: " << std::this_thread::get_id() << std::endl;
     btree_node_ptr_t parent{nullptr};
     btree_node_ptr_t node{nullptr};
 
     node_id_t nodeId = root_->getId();
     while (nodeId != EMPTY_NODE_ID) {
-      std::cout << nodeId << std::endl;
       auto optionalNode = bufferPool_->get(nodeId);
       assert(optionalNode.has_value() && "node not found in buffer_pool");
       node = optionalNode.value();
 
       node->lock();
+
+      if (node->getDataList().size() > 5) {
+        if (node == root_) {
+          auto newNode = bufferPool_->createNew(node->isLeaf());
+          node->copyAllDataBlocks(newNode);
+          node->eraseAll();
+          node->setNonLeaf();
+
+          // No need to lock and unlock the new node as it is not
+          // visible to anybody.
+          //          newNode->lock();
+          split(newNode, node, true);
+          //          newNode->unlock();
+        } else {
+          assert(parent && "parent node cannot be null in non-root split");
+
+          split(node, parent, false);
+
+          node->unlock();
+
+          auto location = parent->search(key);
+          auto optionalBlock = parent->bufferPageControl_->getBlock(location.id);
+          assert(optionalBlock.has_value());
+          auto block = optionalBlock.value();
+          assert(!parent->isLeaf());
+          auto nonLeafKeyValue = readFromNonLeafNode(block.ptr, block.length);
+          nodeId = *nonLeafKeyValue.childNodeId;
+
+          auto optionalNode = bufferPool_->get(nodeId);
+          assert(optionalNode.has_value() && "node not found in buffer_pool");
+          node = optionalNode.value();
+
+          node->lock();
+        }
+      }
+
       if (parent) {
         parent->unlock();
       }
-
-      if (node->getDataList().size() > 5) {
-        bool rootSplit{false};
-        if (node == root_) {
-          auto new_root = bufferPool_->createNew(false);
-          root_ = new_root;
-          parent = root_;
-          parent->lock();
-          rootSplit = true;
-        }
-
-        split(node, parent, rootSplit);
-
-        node->unlock();
-
-        auto optionalParentNode = bufferPool_->get(node->getParent());
-        node = optionalParentNode.value_or(nullptr);
-      }
-
-      parent = node;
 
       if (node->isLeaf()) {
         nodeId = EMPTY_NODE_ID;
@@ -93,11 +109,13 @@ class BTree {
         auto nonLeafKeyValue = readFromNonLeafNode(block.ptr, block.length);
         nodeId = *nonLeafKeyValue.childNodeId;
       }
+
+      parent = node;
     }
 
     if (!parent->getDataList().empty()) {
       auto location = parent->search(key);
-      auto optionalBlock = node->bufferPageControl_->getBlock(location.id);
+      auto optionalBlock = parent->bufferPageControl_->getBlock(location.id);
       assert(optionalBlock.has_value());
 
       assert(parent->isLeaf() && "last step of insertion should always land on leaf node");
@@ -105,6 +123,7 @@ class BTree {
       auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
 
       if (leafKeyValue.getKeyStr() == key) {
+        parent->unlock();
         return false;
       }
     }
