@@ -76,7 +76,9 @@ class BufferPageControl {
 
           data_location_t *dataList{reinterpret_cast<data_location_t *>(blockStart)};
           return dataList;
-        }()} {}
+        }()} {
+    assert(bufferPage_ && "bufferpage_ cannot be null");
+  }
 
   std::int64_t getTotalFreeSpace() {
     // Subtract HeaderSize
