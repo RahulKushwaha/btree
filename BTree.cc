@@ -37,6 +37,70 @@ node_id_t BTree::getRootId() {
 }
 
 bool BTree::insert(std::string key, std::string value) {
+  auto node = findNodeForInsert(std::string_view{key}, std::string_view{value});
+
+  if (!node->getDataList().empty()) {
+    auto location = node->search(key);
+    auto optionalBlock = node->bufferPageControl_->getBlock(location.id);
+    assert(optionalBlock.has_value());
+
+    assert(node->isLeaf() && "last step of insertion should always land on leaf node");
+    auto block = optionalBlock.value();
+    auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
+
+    if (leafKeyValue.getKeyStr() == key) {
+      node->unlock();
+      return false;
+    }
+  }
+
+  // The leaf does not contain the same key. We can proceed with insertion.
+  auto result = node->insertLeaf(key, value);
+  assert(result.first == BTreeNode::Result::SUCCESS);
+
+  node->bufferPageControl_->sortDataList(getCompareFunction(node->isLeaf()));
+  node->unlock();
+
+  return true;
+}
+
+std::optional<std::string> BTree::search(std::string key) {
+  auto node = findNodeForSelect(std::string_view{key});
+
+  if (!node->getDataList().empty()) {
+    auto location = node->search(key);
+    auto optionalBlock = node->bufferPageControl_->getBlock(location.id);
+    assert(optionalBlock.has_value());
+
+    assert(node->isLeaf() && "last step of insertion should always land on leaf node");
+    auto block = optionalBlock.value();
+    auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
+
+    if (leafKeyValue.getKeyStr() == key) {
+      node->unlock();
+      return {};
+    }
+
+    node->unlock();
+    return leafKeyValue.getValueStr();
+  }
+
+  return {};
+}
+
+std::vector<std::string> BTree::elements() {
+  std::vector<std::string> result;
+  elements(root_, result);
+
+  return result;
+}
+
+void BTree::debug_print() {
+  debugPrint(root_);
+  std::cout << std::endl;
+}
+
+btree_node_ptr_t BTree::findNodeForInsert(std::string_view key, std::string_view value) {
   std::cout << "insert: " << key << " running on thread: " << std::this_thread::get_id() << std::endl;
   btree_node_ptr_t parent{nullptr};
   btree_node_ptr_t node{nullptr};
@@ -68,7 +132,7 @@ bool BTree::insert(std::string key, std::string value) {
 
         node->unlock();
 
-        auto location = parent->search(key);
+        auto location = parent->search(std::string{key});
         auto optionalBlock = parent->bufferPageControl_->getBlock(location.id);
         assert(optionalBlock.has_value());
         auto block = optionalBlock.value();
@@ -91,7 +155,7 @@ bool BTree::insert(std::string key, std::string value) {
     if (node->isLeaf()) {
       nodeId = EMPTY_NODE_ID;
     } else {
-      auto location = node->search(key);
+      auto location = node->search(std::string{key});
       auto optionalBlock = node->bufferPageControl_->getBlock(location.id);
       assert(optionalBlock.has_value());
       auto block = optionalBlock.value();
@@ -104,41 +168,43 @@ bool BTree::insert(std::string key, std::string value) {
 
   assert(parent && "parent cannot be null");
 
-  if (!parent->getDataList().empty()) {
-    auto location = parent->search(key);
-    auto optionalBlock = parent->bufferPageControl_->getBlock(location.id);
-    assert(optionalBlock.has_value());
+  return parent;
+}
 
-    assert(parent->isLeaf() && "last step of insertion should always land on leaf node");
-    auto block = optionalBlock.value();
-    auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
+btree_node_ptr_t BTree::findNodeForSelect(std::string_view key) {
+  std::cout << "insert: " << key << " running on thread: " << std::this_thread::get_id() << std::endl;
+  btree_node_ptr_t parent{nullptr};
+  btree_node_ptr_t node{nullptr};
 
-    if (leafKeyValue.getKeyStr() == key) {
+  node_id_t nodeId = root_->getId();
+  while (nodeId != EMPTY_NODE_ID) {
+    auto optionalNode = bufferPool_->get(nodeId);
+    assert(optionalNode.has_value() && "node not found in buffer_pool");
+    node = optionalNode.value();
+    assert(node && "node cannot be null");
+    node->lock();
+
+    if (parent) {
       parent->unlock();
-      return false;
     }
+
+    if (node->isLeaf()) {
+      nodeId = EMPTY_NODE_ID;
+    } else {
+      auto location = node->search(std::string{key});
+      auto optionalBlock = node->bufferPageControl_->getBlock(location.id);
+      assert(optionalBlock.has_value());
+      auto block = optionalBlock.value();
+      auto nonLeafKeyValue = readFromNonLeafNode(block.ptr, block.length);
+      nodeId = *nonLeafKeyValue.childNodeId;
+    }
+
+    parent = node;
   }
 
-  // The leaf does not contain the same key. We can proceed with insertion.
-  auto result = parent->insertLeaf(key, value);
-  assert(result.first == BTreeNode::Result::SUCCESS);
+  assert(parent && "parent cannot be null");
 
-  parent->bufferPageControl_->sortDataList(getCompareFunction(parent->isLeaf()));
-  parent->unlock();
-
-  return true;
-}
-
-std::vector<std::string> BTree::elements() {
-  std::vector<std::string> result;
-  elements(root_, result);
-
-  return result;
-}
-
-void BTree::debug_print() {
-  debugPrint(root_);
-  std::cout << std::endl;
+  return parent;
 }
 
 void BTree::split(btree_node_ptr_t node, btree_node_ptr_t parent, bool rootSplit) {
