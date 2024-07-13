@@ -26,6 +26,7 @@ add_executable(
         LockManager.h
         Transaction.h
         Transaction.h
+        BufferPage.cc
 )
 
 target_link_libraries(

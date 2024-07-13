@@ -3,6 +3,7 @@
 //
 #pragma once
 #include "Common.h"
+
 #include <cassert>
 #include <cerrno>
 #include <cstdint>
@@ -10,11 +11,10 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <type_traits>
 #include <unistd.h>
 
-#include <type_traits>
-
-bool is_aligned(void *p);
+bool is_aligned(void* p);
 
 class FileIO;
 
@@ -26,8 +26,8 @@ class FileIO {
  public:
   explicit FileIO(int fd);
 
-  bool fWrite(offset_t offset, void *buffer);
-  bool fRead(offset_t offset, void *buffer);
+  bool fWrite(offset_t offset, void* buffer);
+  bool fRead(offset_t offset, void* buffer);
   bool sync();
 
   ~FileIO() noexcept;
