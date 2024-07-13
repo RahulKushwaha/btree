@@ -23,6 +23,9 @@ add_executable(
         BTreeNode.h
         BTreeNode.cc
         BTree.cc
+        LockManager.h
+        Transaction.h
+        Transaction.h
 )
 
 target_link_libraries(
