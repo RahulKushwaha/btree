@@ -3,12 +3,14 @@
 //
 
 #include "FileIO.h"
-#include <cassert>
-#include <sys/fcntl.h>
-#include <unistd.h>
-#include <libexplain/pwrite.h>
 
-bool is_aligned(void *p) {
+#include <libexplain/pwrite.h>
+#include <sys/fcntl.h>
+
+#include <cassert>
+#include <unistd.h>
+
+bool is_aligned(void* p) {
   return !(reinterpret_cast<uintptr_t>(p) % 512);
 }
 
@@ -24,7 +26,7 @@ std::shared_ptr<FileIO> makeFileIO(std::string filePath) {
 
 FileIO::FileIO(int fd) : fd_{fd} {}
 
-bool FileIO::fWrite(offset_t offset, void *buffer) {
+bool FileIO::fWrite(offset_t offset, void* buffer) {
   //Check if the input memory buffer is aligned.
   assert(is_aligned(buffer));
   assert(offset % PAGE_SIZE == 0);
@@ -38,7 +40,7 @@ bool FileIO::fWrite(offset_t offset, void *buffer) {
   return true;
 }
 
-bool FileIO::fRead(offset_t offset, void *buffer) {
+bool FileIO::fRead(offset_t offset, void* buffer) {
   //Check if the input memory buffer is aligned.
   assert(is_aligned(buffer));
   assert(offset % PAGE_SIZE == 0);

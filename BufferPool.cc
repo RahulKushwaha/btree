@@ -17,9 +17,9 @@ btree_node_ptr_t BufferPool::createNew(bool isLeaf) {
 
   auto page = std::aligned_alloc(PAGE_SIZE, PAGE_SIZE);
   assert(page && "empty memory returned from aligned alloc");
-  auto bufferPage = reinterpret_cast<BufferPage *>(page);
-  auto *pageControl = new BufferPageControl{bufferPage};
-  auto *node = new BTreeNode{pageControl};
+  auto bufferPage = reinterpret_cast<BufferPage*>(page);
+  auto* pageControl = new BufferPageControl{bufferPage};
+  auto* node = new BTreeNode{pageControl};
 
   auto nodeId = getNext();
 
@@ -41,9 +41,9 @@ std::optional<btree_node_ptr_t> BufferPool::get(node_id_t id) {
   if (itr == lookup_.end()) {
     auto page = std::aligned_alloc(PAGE_SIZE, PAGE_SIZE);
     fileIO_->fRead(id * PAGE_SIZE, page);
-    auto bufferPage = reinterpret_cast<BufferPage *>(page);
-    auto *pageControl = new BufferPageControl{bufferPage};
-    auto *node = new BTreeNode{pageControl};
+    auto bufferPage = reinterpret_cast<BufferPage*>(page);
+    auto* pageControl = new BufferPageControl{bufferPage};
+    auto* node = new BTreeNode{pageControl};
 
     auto result = lookup_.emplace(id, node);
     assert(result.second && "failed to add to buffer pool");
@@ -56,7 +56,7 @@ std::optional<btree_node_ptr_t> BufferPool::get(node_id_t id) {
 void BufferPool::flushAll() {
   std::lock_guard lg{*mtx_};
 
-  for (auto [nodeId, node]: lookup_) {
+  for (auto [nodeId, node] : lookup_) {
     auto offset = nodeId * PAGE_SIZE;
     fileIO_->fWrite(offset, node->bufferPageControl_->getBufferPage());
     fileIO_->sync();
@@ -64,7 +64,7 @@ void BufferPool::flushAll() {
 }
 
 BufferPool::~BufferPool() {
-  for (auto [nodeId, node]: lookup_) {
+  for (auto [nodeId, node] : lookup_) {
     free(node->bufferPageControl_->getBufferPage());
   }
 }

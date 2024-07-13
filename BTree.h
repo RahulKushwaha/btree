@@ -5,6 +5,7 @@
 #pragma once
 #include "BufferPool.h"
 #include "Common.h"
+
 #include <cassert>
 #include <chrono>
 #include <iostream>
@@ -34,11 +35,12 @@ class BTree {
   void debug_print();
 
  private:
-  btree_node_ptr_t findNodeForInsert(std::string_view key, std::string_view value);
+  btree_node_ptr_t findNodeForInsert(std::string_view key,
+                                     std::string_view value);
   btree_node_ptr_t findNodeForSelect(std::string_view key);
   void split(btree_node_ptr_t node, btree_node_ptr_t parent, bool rootSplit);
   void debugPrint(btree_node_ptr_t node) const;
-  void elements(btree_node_ptr_t node, std::vector<std::string> &keys) const;
+  void elements(btree_node_ptr_t node, std::vector<std::string>& keys) const;
 
  private:
   std::shared_ptr<buffer_pool_t> bufferPool_;

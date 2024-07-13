@@ -7,27 +7,31 @@
 constexpr node_id_t EMPTY_NODE_ID = 0;
 
 auto getCompareFunction(bool isLeaf) {
-  auto compareFunction = [leaf = isLeaf](void *block1, void *block2, length_t block1Size, length_t block2Size) {
+  auto compareFunction = [leaf = isLeaf](void* block1, void* block2,
+                                         length_t block1Size,
+                                         length_t block2Size) {
     if (leaf) {
       auto node1 = readFromLeafNode(block1, block1Size);
       auto node2 = readFromLeafNode(block2, block2Size);
-      return memcmp_diff_size(node1.key, node2.key, *node1.keyLength, *node2.keyLength);
+      return memcmp_diff_size(node1.key, node2.key, *node1.keyLength,
+                              *node2.keyLength);
     }
 
     auto node1 = readFromNonLeafNode(block1, block1Size);
     auto node2 = readFromNonLeafNode(block2, block2Size);
-    return memcmp_diff_size(node1.key, node2.key, *node1.keyLength, *node2.keyLength);
+    return memcmp_diff_size(node1.key, node2.key, *node1.keyLength,
+                            *node2.keyLength);
   };
 
   return compareFunction;
 }
 
 BTree::BTree(std::shared_ptr<BufferPool> bufferPool)
-    : bufferPool_{std::move(bufferPool)},
-      root_{bufferPool_->createNew(true)} {}
+    : bufferPool_{std::move(bufferPool)}, root_{bufferPool_->createNew(true)} {}
 
 BTree::BTree(std::shared_ptr<BufferPool> bufferPool, node_id_t rootId)
-    : bufferPool_{std::move(bufferPool)}, root_{bufferPool_->get(rootId).value_or(nullptr)} {
+    : bufferPool_{std::move(bufferPool)},
+      root_{bufferPool_->get(rootId).value_or(nullptr)} {
   assert(root_ != nullptr);
   assert(rootId == root_->getId());
 }
@@ -44,7 +48,8 @@ bool BTree::insert(std::string key, std::string value) {
     auto optionalBlock = node->bufferPageControl_->getBlock(location.id);
     assert(optionalBlock.has_value());
 
-    assert(node->isLeaf() && "last step of insertion should always land on leaf node");
+    assert(node->isLeaf() &&
+           "last step of insertion should always land on leaf node");
     auto block = optionalBlock.value();
     auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
 
@@ -72,7 +77,8 @@ std::optional<std::string> BTree::search(std::string key) {
     auto optionalBlock = node->bufferPageControl_->getBlock(location.id);
     assert(optionalBlock.has_value());
 
-    assert(node->isLeaf() && "last step of insertion should always land on leaf node");
+    assert(node->isLeaf() &&
+           "last step of insertion should always land on leaf node");
     auto block = optionalBlock.value();
     auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
 
@@ -100,8 +106,11 @@ void BTree::debug_print() {
   std::cout << std::endl;
 }
 
-btree_node_ptr_t BTree::findNodeForInsert(std::string_view key, std::string_view value) {
-  std::cout << "insert: " << key << " running on thread: " << std::this_thread::get_id() << std::endl;
+btree_node_ptr_t BTree::findNodeForInsert(std::string_view key,
+                                          std::string_view value) {
+  std::cout << "insert: " << key
+            << " running on thread: " << std::this_thread::get_id()
+            << std::endl;
   btree_node_ptr_t parent{nullptr};
   btree_node_ptr_t node{nullptr};
 
@@ -172,7 +181,9 @@ btree_node_ptr_t BTree::findNodeForInsert(std::string_view key, std::string_view
 }
 
 btree_node_ptr_t BTree::findNodeForSelect(std::string_view key) {
-  std::cout << "insert: " << key << " running on thread: " << std::this_thread::get_id() << std::endl;
+  std::cout << "insert: " << key
+            << " running on thread: " << std::this_thread::get_id()
+            << std::endl;
   btree_node_ptr_t parent{nullptr};
   btree_node_ptr_t node{nullptr};
 
@@ -207,7 +218,8 @@ btree_node_ptr_t BTree::findNodeForSelect(std::string_view key) {
   return parent;
 }
 
-void BTree::split(btree_node_ptr_t node, btree_node_ptr_t parent, bool rootSplit) {
+void BTree::split(btree_node_ptr_t node, btree_node_ptr_t parent,
+                  bool rootSplit) {
   assert(node != nullptr && "node cannot be null");
   assert(parent != nullptr && "parent cannot be null");
 
@@ -217,7 +229,7 @@ void BTree::split(btree_node_ptr_t node, btree_node_ptr_t parent, bool rootSplit
   auto dataLocations = node->getDataList();
   auto splitLimit = dataLocations.size() / 2;
   auto count{0};
-  for (auto &dataLocation: dataLocations) {
+  for (auto& dataLocation : dataLocations) {
     count++;
 
     if (count >= splitLimit) {
@@ -249,16 +261,16 @@ void BTree::debugPrint(btree_node_ptr_t node) const {
   if (node->isLeaf()) {
     std::cout << "Leaf, ";
     std::cout << "node id: " << node->getId() << std::endl;
-    for (const auto &c: node->getDataList()) {
+    for (const auto& c : node->getDataList()) {
       auto optionalBlock = node->bufferPageControl_->getBlock(c.id);
       assert(optionalBlock.has_value());
       auto block = optionalBlock.value();
       auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
-      std::cout << "key: " << leafKeyValue.getKeyStr() << ", value: " << leafKeyValue.getValueStr() << " | ";
+      std::cout << "key: " << leafKeyValue.getKeyStr()
+                << ", value: " << leafKeyValue.getValueStr() << " | ";
     }
 
-    std::cout << std::endl
-              << std::endl;
+    std::cout << std::endl << std::endl;
     return;
   }
 
@@ -267,20 +279,21 @@ void BTree::debugPrint(btree_node_ptr_t node) const {
   }
   std::cout << "Non Leaf, ";
   std::cout << "node id: " << node->getId() << std::endl;
-  for (const auto &c: node->getDataList()) {
+  for (const auto& c : node->getDataList()) {
     auto optionalBlock = node->bufferPageControl_->getBlock(c.id);
     assert(optionalBlock.has_value());
     auto block = optionalBlock.value();
     auto nonLeafKeyValue = readFromNonLeafNode(block.ptr, block.length);
 
-    assert(*nonLeafKeyValue.childNodeId != EMPTY_NODE_ID && "non leaf cannot have nullptr as child");
-    std::cout << "key: " << nonLeafKeyValue.getKeyStr() << ", child: " << *nonLeafKeyValue.childNodeId << " | ";
+    assert(*nonLeafKeyValue.childNodeId != EMPTY_NODE_ID &&
+           "non leaf cannot have nullptr as child");
+    std::cout << "key: " << nonLeafKeyValue.getKeyStr()
+              << ", child: " << *nonLeafKeyValue.childNodeId << " | ";
   }
 
-  std::cout << std::endl
-            << std::endl;
+  std::cout << std::endl << std::endl;
 
-  for (const auto &c: node->getDataList()) {
+  for (const auto& c : node->getDataList()) {
     auto optionalBlock = node->bufferPageControl_->getBlock(c.id);
     assert(optionalBlock.has_value());
     auto block = optionalBlock.value();
@@ -291,13 +304,14 @@ void BTree::debugPrint(btree_node_ptr_t node) const {
   }
 }
 
-void BTree::elements(btree_node_ptr_t node, std::vector<std::string> &keys) const {
+void BTree::elements(btree_node_ptr_t node,
+                     std::vector<std::string>& keys) const {
   if (node == nullptr) {
     return;
   }
 
   if (node->isLeaf()) {
-    for (const auto &c: node->getDataList()) {
+    for (const auto& c : node->getDataList()) {
       auto optionalBlock = node->bufferPageControl_->getBlock(c.id);
       assert(optionalBlock.has_value());
       auto block = optionalBlock.value();
@@ -309,7 +323,7 @@ void BTree::elements(btree_node_ptr_t node, std::vector<std::string> &keys) cons
     return;
   }
 
-  for (const auto &c: node->getDataList()) {
+  for (const auto& c : node->getDataList()) {
     auto optionalBlock = node->bufferPageControl_->getBlock(c.id);
     assert(optionalBlock.has_value());
     auto block = optionalBlock.value();
@@ -318,7 +332,8 @@ void BTree::elements(btree_node_ptr_t node, std::vector<std::string> &keys) cons
     auto childNodeId = *nonLeafKeyValue.childNodeId;
     auto page = bufferPool_->get(childNodeId);
 
-    assert(page.has_value() && "every non-leaf node should always have a valid value for child");
+    assert(page.has_value() &&
+           "every non-leaf node should always have a valid value for child");
     elements(page.value(), keys);
   }
 }
