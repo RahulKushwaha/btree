@@ -82,7 +82,7 @@ std::optional<std::string> BTree::search(std::string key) {
     auto block = optionalBlock.value();
     auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
 
-    if (leafKeyValue.getKeyStr() == key) {
+    if (leafKeyValue.getKeyStr() != key) {
       node->unlock();
       return {};
     }
@@ -91,6 +91,10 @@ std::optional<std::string> BTree::search(std::string key) {
     return leafKeyValue.getValueStr();
   }
 
+  return {};
+}
+
+std::vector<BTree::KeyValue> BTree::scan(ScanOperation scanOperation) {
   return {};
 }
 

@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.22)
 project(btree)
 
 set(CMAKE_CXX_STANDARD 23)
+
+include_directories(${PROJECT_SOURCE_DIR}/)
+
 include(FetchContent)
 FetchContent_Declare(backward
         GIT_REPOSITORY https://github.com/bombela/backward-cpp
@@ -13,20 +16,20 @@ file(GLOB_RECURSE BACKWARD_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_executable(
         btree main.cpp
 
-        BTree.h
-        BufferPool.h
-        BufferPool.cc
-        Common.h
-        BufferPage.h
-        FileIO.h
-        FileIO.cc
-        BTreeNode.h
-        BTreeNode.cc
         BTree.cc
+        BTree.h
+        BTreeNode.cc
+        BTreeNode.h
+        BufferPage.cc
+        BufferPage.h
+        BufferPool.cc
+        BufferPool.h
+        Common.h
+        FileIO.cc
+        FileIO.h
+        LockManager.cc
         LockManager.h
         Transaction.h
-        Transaction.h
-        BufferPage.cc
 )
 
 target_link_libraries(
@@ -47,12 +50,23 @@ enable_testing()
 add_executable(
         tests
         tests/BufferPageTests.cc
-        FileIO.h
-        FileIO.cc
+        tests/FileIOTests.cc
+        tests/BTreeTests.cc
+
+        BTree.cc
+        BTree.h
+        BTreeNode.cc
+        BTreeNode.h
+        BufferPage.cc
+        BufferPage.h
         BufferPool.cc
         BufferPool.h
-        tests/FileIOTests.cc
-        BTreeNode.h
+        Common.h
+        FileIO.cc
+        FileIO.h
+        LockManager.cc
+        LockManager.h
+        Transaction.h
 )
 
 target_link_libraries(

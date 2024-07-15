@@ -368,3 +368,19 @@ void BTreeNode::unlock() {
   std::cout << "threadId: " << std::this_thread::get_id()
             << " unlocked: " << nodeId << std::endl;
 }
+
+void BTreeNode::rLock() {
+  sharedMutex_->lock_shared();
+}
+
+void BTreeNode::rUnlock() {
+  sharedMutex_->unlock_shared();
+}
+
+void BTreeNode::wLock() {
+  sharedMutex_->lock();
+}
+
+void BTreeNode::wUnlock() {
+  sharedMutex_->unlock();
+}

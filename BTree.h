@@ -14,6 +14,20 @@
 #include <shared_mutex>
 #include <vector>
 
+using key_condition_t = std::function<bool(const std::string&)>;
+enum class ScanDirection {
+  Forward,
+  Backward,
+};
+
+struct ScanOperation {
+  std::string startKey;
+  key_condition_t keyCondition;
+  ScanDirection scanDirection;
+  std::int32_t limit;
+  std::int32_t numberOfRowsToScan;
+};
+
 class BTree {
  public:
   struct KeyValue {
@@ -31,6 +45,7 @@ class BTree {
   node_id_t getRootId();
   bool insert(std::string key, std::string value);
   std::optional<std::string> search(std::string key);
+  std::vector<KeyValue> scan(ScanOperation scanOperation);
   std::vector<std::string> elements();
   void debug_print();
 

@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <set>
+#include <shared_mutex>
 #include <sstream>
 #include <thread>
 
@@ -105,9 +106,15 @@ struct BTreeNode {
   void lock();
   void unlock();
 
+  void rLock();
+  void rUnlock();
+  void wLock();
+  void wUnlock();
+
   buffer_page_control_t* bufferPageControl_;
   btree_node_header_t* btreeNodeHeader_;
   std::shared_ptr<std::mutex> mtx_;
+  std::shared_ptr<std::shared_mutex> sharedMutex_;
 };
 
 using btree_node_t = BTreeNode;
