@@ -20,12 +20,6 @@ struct BTreeNodeHeader {
 
 using btree_node_header_t = BTreeNodeHeader;
 
-struct BTreeNodeEndSentinel {
-  std::uint64_t dummy;
-};
-
-using length_t = std::uint16_t;
-
 std::string convertToString(char* ptr, length_t length);
 
 struct NonLeafKeyValue {

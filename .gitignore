@@ -33,3 +33,5 @@
 *.app
 
 cmake-build-debug/
+cmake-build-debug-multipass-ubuntu-16/
+.idea/

@@ -37,3 +37,27 @@ TEST(BTreeTests, NonExistingKey) {
   auto response = bTree.search("hello1");
   ASSERT_FALSE(response.has_value());
 }
+
+TEST(BTreeTests, DeleteOperation) {
+  auto bufferPool = std::make_shared<BufferPool>(nullptr);
+  BTree bTree{bufferPool};
+  std::string key{"hello"};
+  std::string value{"value"};
+
+  // Insert
+  auto result = bTree.insert(key, value);
+  ASSERT_TRUE(result);
+
+  // Find it
+  auto searchResponse = bTree.search(key);
+  ASSERT_TRUE(searchResponse.has_value());
+  ASSERT_EQ(searchResponse.value(), value);
+
+  // Delete Response
+  auto delResponse = bTree.del(std::string_view{key});
+  ASSERT_TRUE(delResponse);
+
+  // Try finding it again
+  searchResponse = bTree.search(key);
+  ASSERT_FALSE(searchResponse.has_value());
+}
