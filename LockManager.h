@@ -4,7 +4,6 @@
 
 #pragma once
 #include "Common.h"
-#include "Transaction.h"
 
 #include <cassert>
 #include <condition_variable>

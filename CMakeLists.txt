@@ -29,7 +29,8 @@ add_executable(
         FileIO.h
         LockManager.cc
         LockManager.h
-        Transaction.h
+        Api.h
+        Api.cc
 )
 
 target_link_libraries(
@@ -66,7 +67,8 @@ add_executable(
         FileIO.h
         LockManager.cc
         LockManager.h
-        Transaction.h
+        Api.h
+        Api.cc
 )
 
 target_link_libraries(

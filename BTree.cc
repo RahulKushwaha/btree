@@ -41,7 +41,7 @@ node_id_t BTree::getRootId() {
 }
 
 bool BTree::insert(std::string key, std::string value) {
-  auto node = findNodeForInsert(std::string_view{key}, std::string_view{value});
+  auto node = findNodeForInsert(std::string_view{key});
 
   if (!node->getDataList().empty()) {
     auto location = node->search(key);
@@ -94,6 +94,33 @@ std::optional<std::string> BTree::search(std::string key) {
   return {};
 }
 
+bool BTree::del(std::string_view key) {
+  auto node = findNodeForInsert(key);
+
+  if (!node->getDataList().empty()) {
+    auto location = node->search(std::string{key});
+    auto optionalBlock = node->bufferPageControl_->getBlock(location.id);
+    assert(optionalBlock.has_value());
+
+    assert(node->isLeaf() &&
+           "last step of insertion should always land on leaf node");
+    auto block = optionalBlock.value();
+    auto leafKeyValue = readFromLeafNode(block.ptr, block.length);
+
+    if (leafKeyValue.getKeyStr() == key) {
+      auto releaseResult = node->bufferPageControl_->releaseBlock(location.id);
+      assert(releaseResult && "release block should be success");
+      node->unlock();
+      return true;
+    }
+
+    node->unlock();
+    return false;
+  }
+
+  return false;
+}
+
 std::vector<BTree::KeyValue> BTree::scan(ScanOperation scanOperation) {
   return {};
 }
@@ -110,8 +137,7 @@ void BTree::debug_print() {
   std::cout << std::endl;
 }
 
-btree_node_ptr_t BTree::findNodeForInsert(std::string_view key,
-                                          std::string_view value) {
+btree_node_ptr_t BTree::findNodeForInsert(std::string_view key) {
   std::cout << "insert: " << key
             << " running on thread: " << std::this_thread::get_id()
             << std::endl;
@@ -153,9 +179,10 @@ btree_node_ptr_t BTree::findNodeForInsert(std::string_view key,
         auto nonLeafKeyValue = readFromNonLeafNode(block.ptr, block.length);
         nodeId = *nonLeafKeyValue.childNodeId;
 
-        auto optionalNode = bufferPool_->get(nodeId);
-        assert(optionalNode.has_value() && "node not found in buffer_pool");
-        node = optionalNode.value();
+        auto optionalChildNode = bufferPool_->get(nodeId);
+        assert(optionalChildNode.has_value() &&
+               "node not found in buffer_pool");
+        node = optionalChildNode.value();
 
         node->lock();
       }

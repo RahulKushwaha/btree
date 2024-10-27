@@ -43,15 +43,17 @@ class BTree {
   BTree(std::shared_ptr<BufferPool> bufferPool, node_id_t rootId);
 
   node_id_t getRootId();
+
   bool insert(std::string key, std::string value);
   std::optional<std::string> search(std::string key);
+  bool del(std::string_view key);
   std::vector<KeyValue> scan(ScanOperation scanOperation);
+
   std::vector<std::string> elements();
   void debug_print();
 
  private:
-  btree_node_ptr_t findNodeForInsert(std::string_view key,
-                                     std::string_view value);
+  btree_node_ptr_t findNodeForInsert(std::string_view key);
   btree_node_ptr_t findNodeForSelect(std::string_view key);
   void split(btree_node_ptr_t node, btree_node_ptr_t parent, bool rootSplit);
   void debugPrint(btree_node_ptr_t node) const;

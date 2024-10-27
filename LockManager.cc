@@ -51,8 +51,8 @@ void LockManager::lock(node_id_t nodeId, Transaction* txn, LockMode lockMode) {
   }
 
   if (suspend) {
-    std::unique_lock uniqueLock{*txn->mtx_};
-    txn->condVar_->wait(uniqueLock,
+    std::unique_lock uniqueLock{*txn->mtx};
+    txn->condVar->wait(uniqueLock,
                         [txnLockRequest]() { return txnLockRequest->granted; });
   }
 }
@@ -108,8 +108,8 @@ void LockManager::unlock(node_id_t nodeId, Transaction* transaction) {
   }
 
   for (auto& lockRequest : wakeUp) {
-    std::unique_lock uniqueLock{*lockRequest->txn->mtx_};
-    lockRequest->txn->condVar_->notify_one();
+    std::unique_lock uniqueLock{*lockRequest->txn->mtx};
+    lockRequest->txn->condVar->notify_one();
   }
 }
 
