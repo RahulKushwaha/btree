@@ -14,6 +14,8 @@
 #include <shared_mutex>
 #include <vector>
 
+constexpr node_id_t EMPTY_NODE_ID = 0;
+
 using key_condition_t = std::function<bool(const std::string&)>;
 enum class ScanDirection {
   Forward,

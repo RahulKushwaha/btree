@@ -4,8 +4,6 @@
 
 #include "BTree.h"
 
-constexpr node_id_t EMPTY_NODE_ID = 0;
-
 auto getCompareFunction(bool isLeaf) {
   auto compareFunction = [leaf = isLeaf](void* block1, void* block2,
                                          length_t block1Size,

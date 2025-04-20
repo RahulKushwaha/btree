@@ -25,22 +25,6 @@ struct BufferPage {
   char data[PAGE_SIZE - HEADER_SIZE];
 };
 
-using data_location_id_t = std::uint32_t;
-
-struct DataLocation {
-  data_location_id_t id;
-  std::uint32_t length;
-
-  friend std::ostream& operator<<(std::ostream& os,
-                                  const DataLocation& location) {
-    os << "startLocation: " << location.id << " length: " << location.length;
-    return os;
-  }
-
-  bool operator==(const DataLocation& other) const {
-    return id == other.id && length == other.length;
-  }
-};
 
 static_assert(std::is_standard_layout_v<BufferPageHeader>);
 static_assert(std::is_standard_layout_v<BufferPage>);
@@ -49,7 +33,6 @@ static_assert(sizeof(BufferPage) == PAGE_SIZE);
 
 using buffer_page_header_t = BufferPageHeader;
 using buffer_page_t = BufferPage;
-using data_location_t = DataLocation;
 
 struct BlockLocation {
   void* ptr;

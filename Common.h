@@ -56,3 +56,22 @@ inline bool memcmp_diff_size(const void* s1, const void* s2,
 
   return size1 < size2;
 }
+
+using data_location_id_t = std::uint32_t;
+
+struct DataLocation {
+  data_location_id_t id;
+  std::uint32_t length;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const DataLocation& location) {
+    os << "startLocation: " << location.id << " length: " << location.length;
+    return os;
+  }
+
+  bool operator==(const DataLocation& other) const {
+    return id == other.id && length == other.length;
+  }
+};
+
+using data_location_t = DataLocation;

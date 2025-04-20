@@ -45,7 +45,7 @@ void writeLeafNode(const std::string& key, const std::string& value,
   assert(totalSize == blockSize &&
          "block size is not equal to the accommodate key and value");
 
-  auto baseAddr = reinterpret_cast<char*>(destBlock);
+  auto baseAddr = static_cast<char*>(destBlock);
   LeafKeyValue leafKeyValue{};
   leafKeyValue.keyLength = reinterpret_cast<length_t*>(baseAddr);
   leafKeyValue.key = reinterpret_cast<char*>(baseAddr + sizeof(length_t));
@@ -54,16 +54,16 @@ void writeLeafNode(const std::string& key, const std::string& value,
   leafKeyValue.value = reinterpret_cast<char*>(baseAddr + sizeof(length_t) +
                                                key.length() + sizeof(length_t));
 
-  *leafKeyValue.keyLength = (length_t)key.size();
+  *leafKeyValue.keyLength = static_cast<length_t>(key.size());
   auto keyAddr = leafKeyValue.key;
   for (auto c : key) {
     *keyAddr = c;
     keyAddr++;
   }
 
-  *leafKeyValue.valueLength = (length_t)value.size();
+  *leafKeyValue.valueLength = static_cast<length_t>(value.size());
   auto valueAddr = leafKeyValue.value;
-  for (auto c : value) {
+  for (const auto c : value) {
     *valueAddr = c;
     valueAddr++;
   }
@@ -289,8 +289,8 @@ void BTreeNode::copyAllDataBlocks(BTreeNode* dest) {
 void BTreeNode::copyDataBlock(data_location_t srcDataLocation,
                               BTreeNode* dest) {
   auto dataDictionaryList = bufferPageControl_->getDataList();
-  auto itr = std::find(dataDictionaryList.begin(), dataDictionaryList.end(),
-                       srcDataLocation);
+  auto itr = std::ranges::find(dataDictionaryList,
+                               srcDataLocation);
 
   if (itr == dataDictionaryList.end()) {
     // data block not found.
